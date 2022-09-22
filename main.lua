@@ -3,7 +3,7 @@
 -- Date: 2022/09/22
 
 ----- Global Variables -----
-local version = "0.0.1"
+local version = "v:0.0.1"
 local monitor = peripheral.wrap("right")
 
 ----- Functions -----
@@ -68,47 +68,34 @@ local function new_rect(x, y, w, h)
 		shift_h = function (self, h)
 			return new_rect(self.x, self.y, self.w, self.h + h)
 		end,
+		shrink = function (self, value)
+			return new_rect(self.x + value, self.y + value, self.w - value * 2, self.h - value * 2)
+		end,
+		expand = function (self, value)
+			return new_rect(self.x - value, self.y - value, self.w + value * 2, self.h + value * 2)
+		end,
 		to_string = function(self)
 			return "Rect(" .. self.x .. ", " .. self.y .. ", " .. self.w .. ", " .. self.h .. ")"
 		end
 	}
 end
 
-local function new_offsets(min, max)
-	min = min or new_vector2(0, 0)
-	max = max or new_vector2(0, 0)
-	return {
-		min = min, max = max,
-		to_string = function(self)
-			return "(" .. self.min:to_string() .. ", " .. self.max:to_string() .. ")"
-		end
-	}
-end
-
-local function new_uni_offsets(value)
-	value = value or 0
-	return new_offsets(new_vector2(value, value), new_vector2(value, value))
-end
-
-local function new_stlye(margin, border, padding, color, border_color, background_color, line_spacing)
+local function new_stlye(has_margin, has_border, has_padding, color, border_color, background_color, line_spacing)
 	-- default values
-	margin = margin or new_uni_offsets(1)
-	border = border or new_uni_offsets(1)
-	padding = padding or new_uni_offsets(1)
 	color = color or colors.white
 	border_color = border_color or colors.gray
 	background_color = background_color or colors.black
 	line_spacing = line_spacing or 1
 	return {
-		margin = margin,
-		border = border,
-		padding = padding,
+		has_margin = has_margin,
+		has_border = has_border,
+		has_padding = has_padding,
 		color = color,
 		border_color = border_color,
 		background_color = background_color,
 		line_spacing = line_spacing,
 		to_string = function(self)
-			return "Style(margin: " .. self.margin:to_string() .. ", border: " .. self.border:to_string() .. ", padding: " .. self.padding:to_string() .. ", color: " .. self.color .. ", border_color: " .. self.border_color .. ", background_color" .. self.background_color .. ")"
+			return "Style(margin: " .. (self.has_margin and "yes" or "no") .. ", border: " .. (self.has_border and "yes" or "no") .. ", padding: " .. (self.has_padding and "yes" or "no") .. ", color: " .. self.color .. ", border_color: " .. self.border_color .. ", background_color" .. self.background_color .. ")"
 		end
 	}
 end
@@ -139,7 +126,6 @@ end
 
 local function draw_hollow_box(rect, color)
 	color = color or colors.white
-	print(rect:to_string())
 	draw_line(rect.x, rect.y, rect.w, color)
 	draw_line(rect.x, rect.y + rect.h, rect.w, color)
 	for i = 1, rect.h - 1 do
@@ -247,7 +233,7 @@ end
 
 local function create_div(rect, style, title)
 	style = style or new_stlye()
-	title = title or "Title"
+	-- title is nil-able
 
 	local div = {
 		rect = rect,
@@ -263,21 +249,12 @@ local function create_div(rect, style, title)
 		end,
 
 		get_border_rect = function(self)
-			return new_rect(
-				self.rect.x + self.style.margin.min.x,
-				self.rect.y + self.style.margin.min.y,
-				self.rect.w - self.style.margin.max.x - self.style.border.max.x + 1,
-				self.rect.h - self.style.margin.max.y - self.style.border.max.y
-			)
+			local margin = self.style.has_margin and 1 or 0
+			return self.rect:shrink(margin)
 		end,
 
 		get_content_rect = function(self)
-			return new_rect(
-				self.rect.x + self.style.margin.min.x + self.style.border.min.x,
-				self.rect.y + self.style.margin.min.y + self.style.border.min.y,
-				self.rect.w - self.style.margin.max.x - self.style.border.max.x - self.style.padding.max.x,
-				self.rect.h - self.style.margin.max.y - self.style.border.max.y - self.style.padding.max.y
-			)
+			return self:get_border_rect():shift_y(((self.title ~= nil) or self.style.has_border) and 1 or 0):shrink(self.style.has_padding and 1 or 0)
 		end,
 
 		draw = function(self, parent_rect)
@@ -288,20 +265,23 @@ local function create_div(rect, style, title)
 			-- draw background
 			draw_box(content_rect, self.style.background_color)
 
-			-- draw border
-			draw_hollow_box(border_rect, self.style.border_color)
+			print(self.style.has_border)
+			if self.style.has_border then
+				-- draw border
+				draw_hollow_box(border_rect, self.style.border_color)
+			end
 
-			-- draw title
-			draw_center_text(border_rect:set_h(1), self.title, self.style.color, self.style.background_color)
+			if self.title ~= nil then
+				-- draw title
+				draw_center_text(border_rect:set_h(1), self.title, self.style.color, self.style.background_color)
+			end
 
 			-- draw elements
-			print(#self.elements)
 
 			local cursor_pos = 0
 
 			for _, element in ipairs(self.elements) do
 				local space_used = element:draw(content_rect:shift_y(cursor_pos):shift_h(-cursor_pos))
-				print(space_used)
 				cursor_pos = cursor_pos + space_used + self.style.line_spacing
 			end
 			return self.rect.h
@@ -321,7 +301,8 @@ local function create_div(rect, style, title)
 			style = style or self.style
 			title = title or "Div"
 
-			local new_div = create_div(self:get_content_rect():offset(rect.x * self.rect.x, rect.y * self.rect.y):set_size(rect.w * self.rect.w, rect.h * self.rect.h), style, title)
+			local content_rect = self:get_content_rect()
+			local new_div = create_div(content_rect:offset(rect.x * content_rect.w, rect.y * content_rect.h):set_size(rect.w * content_rect.w, rect.h * content_rect.h), style, title)
 
 			self:add_element(new_div)
 			return new_div
@@ -342,80 +323,24 @@ local function create_div(rect, style, title)
 	return div
 end
 
---[[
-local function create_div(rect, margin, border, padding, title, border_color, text)
-	padding = padding or {x = 1, y = 1, w = 1, h = 1}
-	margin = margin or {x = 1, y = 1, w = 1, h = 1}
-	border = border or {x = 1, y = 1, w = 1, h = 1}
-	title = title or "Title"
-	border_color = border_color or colors.gray
-	local div = {
-		x = rect.x,
-		y = rect.y,
-		w = rect.w,
-		h = rect.h,
-		margin = margin,
-		border = border,
-		padding = padding,
-		local_cursor = new_vector2(margin.x + border.x + padding.x, margin.y + border.y + padding.y),
-		title = title,
-
-		get_rect = function (self)
-			return new_rect(self.x, self.y, self.w, self.h)
-		end,
-
-		get_border_rect = function (self)
-			return new_rect(
-				self.x + self.margin.x,
-				self.y + self.margin.y,
-				self.w - self.margin.x - self.margin.w,
-				self.h - self.margin.y - self.margin.h
-			)
-		end,
-
-		get_content_rect = function (self)
-			return new_rect(
-				self.x + self.margin.x + self.border.x + self.padding.x,
-				self.y + self.margin.y + self.border.y + self.padding.y,
-				self.w - self.margin.w - self.border.w - self.padding.w,
-				self.h - self.margin.h - self.border.h - self.padding.h
-			)
-		end,
-
-		create_div = function (self, margin, border, padding)
-			return create_div(self:get_content_rect(), margin, border, padding)
-		end,
-
-		draw_frame = function (self, frame_color, text_color)
-			frame_color = frame_color or colors.gray
-			text_color = text_color or colors.white
-
-			local border = self:get_border_rect()
-			draw_hollow_box(border, frame_color)
-			draw_center_text(new_rect(border.x, border.y, border.w, 1), "XiaNight's ComputerCraft GUI", text_color)
-		end,
-	}
-
-	return div
-end
---]]
-
 ----- Main -----
 
 local function draw_main_page()
 	draw_box(screen, colors.black) -- clear screen
 
-	local main_style = new_stlye(nil, nil, nil, colors.white, colors.gray, colors.black)
-	local no_offset = new_uni_offsets(0)
+	local main_style = new_stlye(true, true, true, colors.white, colors.gray, colors.black)
 
-	local document = create_div(screen, new_stlye(no_offset, nil, no_offset, nil), "Document") -- create document div
+	local document = create_div(screen, new_stlye(false, false, false), "Main Panel Display") -- create document div
 
 	local body = document:append_percentage_div(new_rect(0, 0, 0.5, 0.5), main_style, "Body") -- create div 1
 	body:append_text("Hello World! This is multiple lines") -- create text 1
 
 	document:append_text("Another line") -- create text 2
+	document:append_text("Another line") -- create text 3
 	
 	document:draw()
+
+	draw_text(new_vector2(screen.w - #version + 1, 1), version, colors.gray, colors.black)
 
 	print(document.style:to_string())
 end
