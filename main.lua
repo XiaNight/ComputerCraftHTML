@@ -254,7 +254,8 @@ local function create_div(rect, style, title)
 		end,
 
 		get_content_rect = function(self)
-			return self:get_border_rect():shift_y(((self.title ~= nil) or self.style.has_border) and 1 or 0):shrink(self.style.has_padding and 1 or 0)
+			local title_or_border = ((self.title ~= nil) or self.style.has_border) and 1 or 0
+			return self:get_border_rect():shift_y(title_or_border):shift_h(-title_or_border):shrink(self.style.has_padding and 1 or 0)
 		end,
 
 		draw = function(self, parent_rect)
@@ -331,12 +332,18 @@ local function draw_main_page()
 	local main_style = new_stlye(true, true, true, colors.white, colors.gray, colors.black)
 
 	local document = create_div(screen, new_stlye(false, false, false), "Main Panel Display") -- create document div
+	print(document:get_content_rect():to_string())
 
 	local body = document:append_percentage_div(new_rect(0, 0, 0.5, 0.5), main_style, "Body") -- create div 1
 	body:append_text("Hello World! This is multiple lines") -- create text 1
 
 	document:append_text("Another line") -- create text 2
 	document:append_text("Another line") -- create text 3
+
+	local right_panel = document:append_percentage_div(new_rect(0.5, 0, 0.5, 1), main_style, "Menu") -- create div 2
+	right_panel:append_text("Start") -- create text 4
+	right_panel:append_text("Options") -- create text 4
+	right_panel:append_text("Exit") -- create text 4
 	
 	document:draw()
 
