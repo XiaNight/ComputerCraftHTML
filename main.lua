@@ -5,9 +5,6 @@
 ----- Global Variables -----
 
 local version = "v:0.0.1"
-local main_monitor_side = "right"
-local monitor = peripheral.wrap(main_monitor_side)
-monitor.setTextScale(0.7)
 
 ----- Debug Monitor -----
 
@@ -127,47 +124,39 @@ local function new_stlye(has_margin, has_border, has_padding, color, border_colo
 	}
 end
 
------ Environments -----
-
-local display_width, display_height = monitor.getSize()
-local screen = new_rect(1, 1, display_width, display_height)
-
--- debug screen size
-debug_log(string.format("Screen size: %d, %d", display_width, display_height))
-
 ----- Functions -----
 
-local function draw_pixel(x, y, color)
+local function draw_pixel(monitor, x, y, color)
 	monitor.setCursorPos(x, y)
 	monitor.setBackgroundColor(color)
 	monitor.write(" ")
 end
 
-local function draw_line(x, y, length, color)
+local function draw_line(monitor, x, y, length, color)
 	color = color or colors.white
 	monitor.setBackgroundColor(color)
 	monitor.setCursorPos(x, y)
 	monitor.write(string.rep(" ", length))
 end
 
-local function draw_box(rect, color)
+local function draw_box(monitor, rect, color)
 	color = color or colors.white
 	for i = 0, rect.h - 1 do
-		draw_line(rect.x, rect.y + i, rect.w, color)
+		draw_line(monitor, rect.x, rect.y + i, rect.w, color)
 	end
 end
 
-local function draw_hollow_box(rect, color)
+local function draw_hollow_box(monitor, rect, color)
 	color = color or colors.white
-	draw_line(rect.x, rect.y, rect.w, color)
-	draw_line(rect.x, rect.y + rect.h, rect.w, color)
+	draw_line(monitor, rect.x, rect.y, rect.w, color)
+	draw_line(monitor, rect.x, rect.y + rect.h, rect.w, color)
 	for i = 0, rect.h - 1 do
-		draw_line(rect.x, rect.y + i, 1, color)
-		draw_line(rect.x + rect.w - 1, rect.y + i, 1, color)
+		draw_line(monitor, rect.x, rect.y + i, 1, color)
+		draw_line(monitor, rect.x + rect.w - 1, rect.y + i, 1, color)
 	end
 end
 
-local function draw_text(pos, text, color, bg_color)
+local function draw_text(monitor, pos, text, color, bg_color)
 	color = color or colors.white
 	bg_color = bg_color or colors.black
 
@@ -199,19 +188,19 @@ local function wrap_text(str, limit)
 	return {texts = wrapped, lines = lines}
   end
 
-local function draw_text_wrap(pos, text, width, color, bg_color)
+local function draw_text_wrap(monitor, pos, text, width, color, bg_color)
 	-- draw text with word wrap
 	local wrapped_text = wrap_text(text, width)
 
 	for _, wrap in ipairs(wrapped_text.texts) do
-		draw_text(pos, wrap, color, bg_color)
+		draw_text(monitor, pos, wrap, color, bg_color)
 		pos = pos:add(new_vector2(0, 1))
 	end
 
 	return wrapped_text.lines
 end
 
-local function draw_center_text(rect, text, color, bg_color)
+local function draw_center_text(monitor, rect, text, color, bg_color)
 	color = color or colors.white
 	text = text or "Title"
 	bg_color = bg_color or colors.black
@@ -221,7 +210,7 @@ local function draw_center_text(rect, text, color, bg_color)
 	debug_log(rect:to_string())
 	local text_pos = new_vector2(math.floor(rect.x + (rect.w - text_width) / 2), rect.y + math.floor(rect.h / 2))
 	debug_log(text_pos:to_string())
-	draw_text(text_pos, text, color, bg_color)
+	draw_text(monitor, text_pos, text, color, bg_color)
 end
 
 local function new_button(text, onclick_event, color, background_color)
@@ -233,21 +222,27 @@ local function new_button(text, onclick_event, color, background_color)
 		background_color = background_color,
 		onclick_event = onclick_event,
 
+        drew_region = nil,
+
 		region = function(self, rect)
-			if rect:set_h(3):shift_x(1):shift_w(-2) then
-				self.onclick_event()
-			end
+			return rect:set_h(3):shift_x(1):shift_w(-2)
 		end,
 
 		check_click = function(self, pos)
-			return self.region:in_bounds(pos.x, pos.y)
+            debug_log("Button getting clicked")
+            if self.drew_region then
+			    return self.drew_region:in_bounds(pos.x, pos.y)
+            else 
+                return false
+            end
 		end,
 
-		draw = function(self, parent_rect)
+		draw = function(self, monitor, parent_rect)
 			local rect = self:region(parent_rect)
+            self.drew_region = rect
 			debug_log(rect:to_string())
-			draw_box(rect, self.background_color)
-			draw_center_text(rect, self.text, self.color, self.background_color)
+			draw_box(monitor, rect, self.background_color)
+			draw_center_text(monitor, rect, self.text, self.color, self.background_color)
 			return 3
 		end
 	}
@@ -261,8 +256,8 @@ local function new_text(text, color, bg_color)
 		color = color,
 		bg_color = bg_color,
 
-		draw = function(self, parent_rect)
-			return draw_text_wrap(new_vector2(parent_rect.x + 1, parent_rect.y + 1), self.text, parent_rect.w - 2, self.color, self.bg_color)
+		draw = function(self, monitor, parent_rect)
+			return draw_text_wrap(monitor, new_vector2(parent_rect.x + 1, parent_rect.y + 1), self.text, parent_rect.w - 2, self.color, self.bg_color)
 		end,
 
 		to_string = function(self)
@@ -279,8 +274,8 @@ local function new_dynamic_text(callback, color, bg_color)
 		color = color,
 		bg_color = bg_color,
 
-		draw = function(self, parent_rect)
-			return draw_text_wrap(new_vector2(parent_rect.x + 1, parent_rect.y + 1), self.callback(), parent_rect.w - 2, self.color, self.bg_color)
+		draw = function(self, monitor, parent_rect)
+			return draw_text_wrap(monitor, new_vector2(parent_rect.x + 1, parent_rect.y + 1), self.callback(), parent_rect.w - 2, self.color, self.bg_color)
 		end,
 
 		to_string = function(self)
@@ -317,30 +312,41 @@ local function create_div(rect, style, title)
 		end,
 
 		handle_click_event = function(self, pos)
+            debug_log(title .. " div clicked")
+
 			for _, element in ipairs(self.elements) do
-				if element.check_click and element.check_click(pos) then
-					element.onclick_event()
-				end
+
+                if element.handle_click_event then
+                    element:handle_click_event(pos)
+                end
+
+                if element.check_click then
+                    debug_log("checking button")
+                    if element:check_click(pos) then
+                        debug_log("calling button event")
+                        element:onclick_event()
+                    end
+                end
 			end
 		end,
 
-		draw = function(self, parent_rect)
+		draw = function(self, monitor, parent_rect)
 
 			local border_rect = self:get_border_rect()
 			local content_rect = self:get_content_rect()
 
 			-- draw background
-			draw_box(content_rect, self.style.background_color)
+			draw_box(monitor, content_rect, self.style.background_color)
 
 			debug_log(self.style.has_border)
 			if self.style.has_border then
 				-- draw border
-				draw_hollow_box(border_rect, self.style.border_color)
+				draw_hollow_box(monitor, border_rect, self.style.border_color)
 			end
 
 			if self.title ~= nil then
 				-- draw title
-				draw_center_text(border_rect:set_h(1), self.title, self.style.color, self.style.background_color)
+				draw_center_text(monitor, border_rect:set_h(1), self.title, self.style.color, self.style.background_color)
 			end
 
 			-- draw elements
@@ -348,7 +354,7 @@ local function create_div(rect, style, title)
 			local cursor_pos = 0
 
 			for _, element in ipairs(self.elements) do
-				local space_used = element:draw(content_rect:shift_y(cursor_pos):shift_h(-cursor_pos))
+				local space_used = element:draw(monitor, content_rect:shift_y(cursor_pos):shift_h(-cursor_pos))
 				cursor_pos = cursor_pos + space_used + self.style.line_spacing
 			end
 			return self.rect.h
@@ -390,31 +396,100 @@ local function create_div(rect, style, title)
 	return div
 end
 
+local function create_window(screen, title, main_style)
+	local document = create_div(screen, new_stlye(false, false, false), title) -- create document div
+
+    return {
+        style = main_style,
+        document = document,
+        draw = function(self, monitor, screen)
+            self.document:draw(monitor, screen)
+        end,
+        handle_click_event = function(self, pos)
+            debug_log("window clicked")
+            self.document:handle_click_event(pos)
+        end
+    }
+end
+
+local function create_monitor(monitor_id, text_scale)
+    text_scale = text_scale or 1
+    local monitor = peripheral.wrap(monitor_id)
+
+    if monitor == nil then
+        debug_log("Cannot find monitor")
+        return
+    end
+
+    monitor.setTextScale(text_scale)
+    
+    local display_width, display_height = monitor.getSize()
+    
+    -- debug screen size
+    debug_log(string.format("Screen size: %d, %d", display_width, display_height))
+
+    return {
+        monitor_id = monitor_id,
+        monitor = monitor,
+        screen = new_rect(1, 1, display_width, display_height),
+        windows = {},
+
+        clear = function(self)
+            self.monitor.setBackgroundColor(colors.black)
+            self.monitor.clear()
+        end,
+
+		add_window = function(self, title, main_style)
+            title = title or "New Window"
+            main_style = main_style or new_stlye(true, true, true, colors.white, colors.gray, colors.black)
+
+            local created_window = create_window(self.screen, title, main_style)
+			table.insert(self.windows, created_window)
+
+			return created_window.document
+		end,
+
+        draw_screen_button = function (self)
+            draw_pixel(self.monitor, 1, 1, colors.red)
+            draw_pixel(self.monitor, 2, 1, colors.yellow)
+            draw_pixel(self.monitor, 3, 1, colors.lime)
+        end,
+
+        draw = function(self)
+            self:clear()
+            self:draw_screen_button()
+
+            for _, window in ipairs(self.windows) do
+				window:draw(self.monitor, self.screen)
+			end
+        end,
+        handle_click_event = function(self, pos)
+            debug_log("monitor clicked")
+            for _, window in ipairs(self.windows) do
+                window:handle_click_event(pos)
+			end
+        end
+    }
+end
+
 ----- Main -----
 
 local debug = true
 
-local function clear()
-	monitor.setBackgroundColor(colors.black)
-	monitor.clear()
-	-- draw_box(screen, colors.black) -- clear screen
-end
+local monitors = {}
 
-local function draw_screen_button()
-	draw_pixel(1, 1, colors.red)
-	draw_pixel(2, 1, colors.yellow)
-	draw_pixel(3, 1, colors.lime)
+local function register_monitor(monitor)
+    table.insert(monitors, monitor)
 end
 
 local function draw_main_page()
-	clear()
 
-	draw_screen_button()
+    local main_monitor = create_monitor("right", 0.7)
+    local document = main_monitor:add_window()
 
-	local main_style = new_stlye(true, true, true, colors.white, colors.gray, colors.black)
-
-	local document = create_div(screen, new_stlye(false, false, false), "Main Panel Display") -- create document div
 	debug_log(document:get_content_rect():to_string())
+
+    local main_style = main_style or new_stlye(true, true, true, colors.white, colors.gray, colors.black)
 
 	local body = document:append_percentage_div(new_rect(0, 0, 0.5, 0.5), main_style, "Body") -- create div 1
 	body:append_text("Hello World! This is multiple lines") -- create text 1
@@ -426,34 +501,47 @@ local function draw_main_page()
 	right_panel:append_text("Start") -- create text 4
 	right_panel:append_text("Options") -- create text 4
 	right_panel:append_text("Exit") -- create text 4
+
+    local new_button_event = function()
+        debug_log("test")
+    end
 	
-	local page_2_btn = new_button("Next Page", nil, colors.lime)
+	local page_2_btn = new_button("Next Page", new_button_event, colors.black, colors.lime)
 	right_panel:add_element(page_2_btn)
 	
-	document:draw()
+	main_monitor:draw()
 
-	draw_text(new_vector2(screen.w - #version + 1, 1), version, colors.gray, colors.black)
+	-- draw_text(new_vector2(screen.w - #version + 1, 1), version, colors.gray, colors.black)
 
 	debug_log(document.style:to_string())
+
+    register_monitor(main_monitor)
 end
 
 local function draw_debug_page()
-	draw_box(screen, colors.black) -- clear screen
+	-- draw_box(screen, colors.black) -- clear screen
 
-	local main_style = new_stlye(true, true, true, colors.white, colors.gray, colors.black)
+	-- local main_style = new_stlye(true, true, true, colors.white, colors.gray, colors.black)
 
-	local document = create_div(screen, new_stlye(false, false, false), "Main Panel Display") -- create document div
-	debug_log(document:get_content_rect():to_string())
+	-- local document = create_div(screen, new_stlye(false, false, false), "Main Panel Display") -- create document div
+	-- debug_log(document:get_content_rect():to_string())
 
-	draw_box(new_rect(10, 10, 5, 5), colors.red)
+	-- draw_box(new_rect(10, 10, 5, 5), colors.red)
 end
 
-local function on_touch(pos)
+local function on_click(monitor_id, pos)
 	debug_log("Touch: " .. pos.x .. ", " .. pos.y)
 
 	if pos.x == 1 and pos.y == 1 then
 		return -1
 	end
+
+    for _, monitor in ipairs(monitors) do
+        if monitor.monitor_id == monitor_id then
+            monitor:handle_click_event(pos)
+            break
+        end
+    end
 
 	if debug then
 		-- draw_pixel(pos.x, pos.y, colors.blue)
@@ -466,16 +554,13 @@ local function events()
 	while true do
 		local event, p1, p2, p3 = os.pullEvent()
 		debug_log(event)
-		if p1 == main_monitor_side then
-			if event == "monitor_touch" then
-				if on_touch(new_vector2(p2, p3)) < 0 then
-					break
-				end
-			end
-		end
+		if event == "monitor_touch" then
+            if on_click(p1, new_vector2(p2, p3)) < 0 then
+                break
+            end
+        end
 	end
 end
 
 draw_main_page()
 events()
-clear()
