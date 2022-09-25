@@ -14,7 +14,6 @@ local function debug_log(object)
 	local str = ""
 	if type(object) == "string" then
 		str = object
-		-- else if object is boolean
 	elseif type(object) == "boolean" then
 		str = tostring(object)
 	elseif type(object) == "number" then
@@ -22,6 +21,7 @@ local function debug_log(object)
 	elseif object.to_string then
 		str = object:to_string()
 	end
+	print(str)
 	external_terminal.scroll(-1)
 	external_terminal.write(str)
 	external_terminal.setCursorPos(1, 1)
@@ -124,7 +124,7 @@ local function new_stlye(has_margin, has_border, has_padding, color, border_colo
 	}
 end
 
------ Functions -----
+----- Draw Functions -----
 
 local function draw_pixel(monitor, x, y, color)
 	monitor.setCursorPos(x, y)
@@ -207,11 +207,11 @@ local function draw_center_text(monitor, rect, text, color, bg_color)
 
 	text = " " .. text .. " "
 	local text_width = string.len(text)
-	debug_log(rect:to_string())
 	local text_pos = new_vector2(math.floor(rect.x + (rect.w - text_width) / 2), rect.y + math.floor(rect.h / 2))
-	debug_log(text_pos:to_string())
 	draw_text(monitor, text_pos, text, color, bg_color)
 end
+
+----- Elements -----
 
 local function new_button(text, onclick_event, color, background_color)
 	color = color or colors.white
@@ -240,7 +240,6 @@ local function new_button(text, onclick_event, color, background_color)
 		draw = function(self, monitor, parent_rect)
 			local rect = self:region(parent_rect)
 			self.drew_region = rect
-			debug_log(rect:to_string())
 			draw_box(monitor, rect, self.background_color)
 			draw_center_text(monitor, rect, self.text, self.color, self.background_color)
 			return 3
@@ -312,7 +311,6 @@ local function create_div(rect, style, title)
 		end,
 
 		handle_click_event = function(self, pos)
-			debug_log(title .. " div clicked")
 
 			for _, element in ipairs(self.elements) do
 
@@ -321,9 +319,7 @@ local function create_div(rect, style, title)
 				end
 
 				if element.check_click then
-					debug_log("checking button")
 					if element:check_click(pos) then
-						debug_log("calling button event")
 						element:onclick_event()
 					end
 				end
@@ -337,8 +333,6 @@ local function create_div(rect, style, title)
 
 			-- draw background
 			draw_box(monitor, content_rect, self.style.background_color)
-
-			debug_log(self.style.has_border)
 			if self.style.has_border then
 				-- draw border
 				draw_hollow_box(monitor, border_rect, self.style.border_color)
@@ -383,12 +377,6 @@ local function create_div(rect, style, title)
 
 		append_text = function(self, text)
 			local new_text = new_text(text, self.style.color, self.style.background_color)
-			self:add_element(new_text)
-			return new_text
-		end,
-
-		append_dynamic_text = function(self, text, color, bg_color)
-			local new_text = new_dynamic_text(text, color, bg_color)
 			self:add_element(new_text)
 			return new_text
 		end,
@@ -482,7 +470,7 @@ local function register_monitor(monitor)
 	table.insert(monitors, monitor)
 end
 
-local function draw_main_page()
+local function register_main_page()
 
 	local main_monitor = create_monitor("right", 0.7)
 	if main_monitor == nil then
@@ -490,12 +478,11 @@ local function draw_main_page()
 	end
 	local document = main_monitor:add_window()
 
-	debug_log(document:get_content_rect():to_string())
-
 	local main_style = main_style or new_stlye(true, true, true, colors.white, colors.gray, colors.black)
 
 	local body = document:append_percentage_div(new_rect(0, 0, 0.5, 0.5), main_style, "Body") -- create div 1
 	body:append_text("Hello World! This is multiple lines") -- create text 1
+	body:add_element(new_dynamic_text(function() return "Time: " .. os.time() end, main_style.color, main_style.background_color)) -- create dynamic text 1
 
 	document:append_text("Another line") -- create text 2
 	document:append_text("Another line") -- create text 3
@@ -556,14 +543,36 @@ end
 local function events()
 	while true do
 		local event, p1, p2, p3 = os.pullEvent()
-		debug_log(event)
+		if event ~= "timer" then
+			debug_log(event)
+		end
+
 		if event == "monitor_touch" then
 			if on_click(p1, new_vector2(p2, p3)) < 0 then
+				break
+			end
+		end
+
+		if event == "key" then
+			debug_log(p1)
+			if p1 == keys.q then
 				break
 			end
 		end
 	end
 end
 
-draw_main_page()
-events()
+local function draw_loop()
+	while true do
+		for _, monitor in ipairs(monitors) do
+			monitor:draw()
+		end
+		sleep(0.5)
+	end
+end
+
+debug_log("Starting Up...")
+debug_log("Press Q to quit")
+
+register_main_page()
+parallel.waitForAny(draw_loop,events)
