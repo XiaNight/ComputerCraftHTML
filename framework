@@ -149,6 +149,19 @@ function NewStyle(has_margin, has_border, has_padding, color, border_color, back
 	}
 end
 
+function CompactValue(value)
+	-- return value with K, M, G, T, P, E, Z, Y suffixes
+	local suffixes = {"", "K", "M", "G", "T", "P", "E", "Z", "Y"}
+	local suffix_index = 1
+	while value >= 1000 do
+		value = value / 1000
+		suffix_index = suffix_index + 1
+	end
+	-- round to 2 decimal places, add 0 to end if needed
+	value = math.floor(value * 100 + 0.5) / 100
+	return value .. suffixes[suffix_index]
+end
+
 ----- Draw Functions -----
 
 function DrawPixel(monitor, x, y, color)
@@ -351,8 +364,7 @@ function CreateDiv(rect, style, title)
 			end
 		end,
 
-		draw = function(self, monitor, parent_rect)
-
+		draw_frame = function(self, monitor, parent_rect)
 			local border_rect = self:get_border_rect()
 			local content_rect = self:get_content_rect()
 
@@ -367,10 +379,20 @@ function CreateDiv(rect, style, title)
 				-- draw title
 				DrawCenterText(monitor, border_rect:set_h(1), self.title, self.style.color, self.style.background_color)
 			end
+			
+			-- Draw Child Div
+			for _, element in ipairs(self.elements) do
+				if element.draw_frame then
+					element:draw_frame(monitor)
+				end
+			end
+		end,
 
+		draw = function(self, monitor, parent_rect)
 			-- draw elements
 
 			local cursor_pos = 0
+			local content_rect = self:get_content_rect()
 
 			for _, element in ipairs(self.elements) do
 				local space_used = element:draw(monitor, content_rect:shift_y(cursor_pos):shift_h(-cursor_pos))
@@ -415,6 +437,9 @@ function CreateWindow(screen, title, main_style)
 	return {
 		style = main_style,
 		document = document,
+		draw_frame = function(self, monitor, screen)
+			self.document:draw_frame(monitor, screen)
+		end,
 		draw = function(self, monitor, screen)
 			self.document:draw(monitor, screen)
 		end,
@@ -468,10 +493,15 @@ function CreateMonitor(monitor_id, text_scale)
 			DrawPixel(self.monitor, 3, 1, colors.lime)
 		end,
 
-		draw = function(self)
+		draw_window_frames = function(self)
 			self:clear()
 			self:draw_screen_button()
+			for _, window in ipairs(self.windows) do
+				window:draw_frame(self.monitor, self.screen)
+			end
+		end,
 
+		draw = function(self)
 			for _, window in ipairs(self.windows) do
 				window:draw(self.monitor, self.screen)
 			end
@@ -540,19 +570,27 @@ local function events()
 	end
 end
 
+local update_frequency = 0.5
+
 local function draw_loop()
+	for _, monitor in ipairs(monitors) do
+		monitor:draw_window_frames()
+	end
 	while true do
 		for _, monitor in ipairs(monitors) do
 			monitor:draw()
 		end
-		sleep(0.5)
+		sleep(update_frequency)
 	end
 end
 
-function Init()
+function Init(frequency)
+	frequency = frequency or 0.5
+	update_frequency = frequency
+
 	DebugLog("Framework Initiating", colors.green)
 	DebugLog("Press Q to quit...", colors.green)
-	parallel.waitForAny(draw_loop,events)
+	parallel.waitForAny(draw_loop, events)
 end
 
 DebugLog("Framework Loaded", colors.green)
