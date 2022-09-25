@@ -222,24 +222,24 @@ local function new_button(text, onclick_event, color, background_color)
 		background_color = background_color,
 		onclick_event = onclick_event,
 
-        drew_region = nil,
+		drew_region = nil,
 
 		region = function(self, rect)
 			return rect:set_h(3):shift_x(1):shift_w(-2)
 		end,
 
 		check_click = function(self, pos)
-            debug_log("Button getting clicked")
-            if self.drew_region then
-			    return self.drew_region:in_bounds(pos.x, pos.y)
-            else 
-                return false
-            end
+			debug_log("Button getting clicked")
+			if self.drew_region then
+				return self.drew_region:in_bounds(pos.x, pos.y)
+			else 
+				return false
+			end
 		end,
 
 		draw = function(self, monitor, parent_rect)
 			local rect = self:region(parent_rect)
-            self.drew_region = rect
+			self.drew_region = rect
 			debug_log(rect:to_string())
 			draw_box(monitor, rect, self.background_color)
 			draw_center_text(monitor, rect, self.text, self.color, self.background_color)
@@ -312,21 +312,21 @@ local function create_div(rect, style, title)
 		end,
 
 		handle_click_event = function(self, pos)
-            debug_log(title .. " div clicked")
+			debug_log(title .. " div clicked")
 
 			for _, element in ipairs(self.elements) do
 
-                if element.handle_click_event then
-                    element:handle_click_event(pos)
-                end
+				if element.handle_click_event then
+					element:handle_click_event(pos)
+				end
 
-                if element.check_click then
-                    debug_log("checking button")
-                    if element:check_click(pos) then
-                        debug_log("calling button event")
-                        element:onclick_event()
-                    end
-                end
+				if element.check_click then
+					debug_log("checking button")
+					if element:check_click(pos) then
+						debug_log("calling button event")
+						element:onclick_event()
+					end
+				end
 			end
 		end,
 
@@ -399,77 +399,77 @@ end
 local function create_window(screen, title, main_style)
 	local document = create_div(screen, new_stlye(false, false, false), title) -- create document div
 
-    return {
-        style = main_style,
-        document = document,
-        draw = function(self, monitor, screen)
-            self.document:draw(monitor, screen)
-        end,
-        handle_click_event = function(self, pos)
-            debug_log("window clicked")
-            self.document:handle_click_event(pos)
-        end
-    }
+	return {
+		style = main_style,
+		document = document,
+		draw = function(self, monitor, screen)
+			self.document:draw(monitor, screen)
+		end,
+		handle_click_event = function(self, pos)
+			debug_log("window clicked")
+			self.document:handle_click_event(pos)
+		end
+	}
 end
 
 local function create_monitor(monitor_id, text_scale)
-    text_scale = text_scale or 1
-    local monitor = peripheral.wrap(monitor_id)
+	text_scale = text_scale or 1
+	local monitor = peripheral.wrap(monitor_id)
 
-    if monitor == nil then
-        debug_log("Cannot find monitor")
-        return
-    end
+	if monitor == nil then
+		debug_log("Can not find monitor id: " .. monitor_id)
+		return
+	end
 
-    monitor.setTextScale(text_scale)
-    
-    local display_width, display_height = monitor.getSize()
-    
-    -- debug screen size
-    debug_log(string.format("Screen size: %d, %d", display_width, display_height))
+	monitor.setTextScale(text_scale)
+	
+	local display_width, display_height = monitor.getSize()
+	
+	-- debug screen size
+	debug_log(string.format("Screen size: %d, %d", display_width, display_height))
 
-    return {
-        monitor_id = monitor_id,
-        monitor = monitor,
-        screen = new_rect(1, 1, display_width, display_height),
-        windows = {},
+	return {
+		monitor_id = monitor_id,
+		monitor = monitor,
+		screen = new_rect(1, 1, display_width, display_height),
+		windows = {},
 
-        clear = function(self)
-            self.monitor.setBackgroundColor(colors.black)
-            self.monitor.clear()
-        end,
+		clear = function(self)
+			self.monitor.setBackgroundColor(colors.black)
+			self.monitor.clear()
+		end,
 
 		add_window = function(self, title, main_style)
-            title = title or "New Window"
-            main_style = main_style or new_stlye(true, true, true, colors.white, colors.gray, colors.black)
+			title = title or "New Window"
+			main_style = main_style or new_stlye(true, true, true, colors.white, colors.gray, colors.black)
 
-            local created_window = create_window(self.screen, title, main_style)
+			local created_window = create_window(self.screen, title, main_style)
 			table.insert(self.windows, created_window)
 
 			return created_window.document
 		end,
 
-        draw_screen_button = function (self)
-            draw_pixel(self.monitor, 1, 1, colors.red)
-            draw_pixel(self.monitor, 2, 1, colors.yellow)
-            draw_pixel(self.monitor, 3, 1, colors.lime)
-        end,
+		draw_screen_button = function (self)
+			draw_pixel(self.monitor, 1, 1, colors.red)
+			draw_pixel(self.monitor, 2, 1, colors.yellow)
+			draw_pixel(self.monitor, 3, 1, colors.lime)
+		end,
 
-        draw = function(self)
-            self:clear()
-            self:draw_screen_button()
+		draw = function(self)
+			self:clear()
+			self:draw_screen_button()
 
-            for _, window in ipairs(self.windows) do
+			for _, window in ipairs(self.windows) do
 				window:draw(self.monitor, self.screen)
 			end
-        end,
-        handle_click_event = function(self, pos)
-            debug_log("monitor clicked")
-            for _, window in ipairs(self.windows) do
-                window:handle_click_event(pos)
+		end,
+		handle_click_event = function(self, pos)
+			debug_log("monitor clicked")
+			for _, window in ipairs(self.windows) do
+				window:handle_click_event(pos)
 			end
-        end
-    }
+		end
+	}
 end
 
 ----- Main -----
@@ -479,17 +479,20 @@ local debug = true
 local monitors = {}
 
 local function register_monitor(monitor)
-    table.insert(monitors, monitor)
+	table.insert(monitors, monitor)
 end
 
 local function draw_main_page()
 
-    local main_monitor = create_monitor("right", 0.7)
-    local document = main_monitor:add_window()
+	local main_monitor = create_monitor("right", 0.7)
+	if main_monitor == nil then
+		return
+	end
+	local document = main_monitor:add_window()
 
 	debug_log(document:get_content_rect():to_string())
 
-    local main_style = main_style or new_stlye(true, true, true, colors.white, colors.gray, colors.black)
+	local main_style = main_style or new_stlye(true, true, true, colors.white, colors.gray, colors.black)
 
 	local body = document:append_percentage_div(new_rect(0, 0, 0.5, 0.5), main_style, "Body") -- create div 1
 	body:append_text("Hello World! This is multiple lines") -- create text 1
@@ -502,9 +505,9 @@ local function draw_main_page()
 	right_panel:append_text("Options") -- create text 4
 	right_panel:append_text("Exit") -- create text 4
 
-    local new_button_event = function()
-        debug_log("test")
-    end
+	local new_button_event = function()
+		debug_log("test")
+	end
 	
 	local page_2_btn = new_button("Next Page", new_button_event, colors.black, colors.lime)
 	right_panel:add_element(page_2_btn)
@@ -515,7 +518,7 @@ local function draw_main_page()
 
 	debug_log(document.style:to_string())
 
-    register_monitor(main_monitor)
+	register_monitor(main_monitor)
 end
 
 local function draw_debug_page()
@@ -536,12 +539,12 @@ local function on_click(monitor_id, pos)
 		return -1
 	end
 
-    for _, monitor in ipairs(monitors) do
-        if monitor.monitor_id == monitor_id then
-            monitor:handle_click_event(pos)
-            break
-        end
-    end
+	for _, monitor in ipairs(monitors) do
+		if monitor.monitor_id == monitor_id then
+			monitor:handle_click_event(pos)
+			break
+		end
+	end
 
 	if debug then
 		-- draw_pixel(pos.x, pos.y, colors.blue)
@@ -555,10 +558,10 @@ local function events()
 		local event, p1, p2, p3 = os.pullEvent()
 		debug_log(event)
 		if event == "monitor_touch" then
-            if on_click(p1, new_vector2(p2, p3)) < 0 then
-                break
-            end
-        end
+			if on_click(p1, new_vector2(p2, p3)) < 0 then
+				break
+			end
+		end
 	end
 end
 
