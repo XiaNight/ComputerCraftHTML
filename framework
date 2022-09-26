@@ -321,6 +321,29 @@ function NewDynamicText(callback, color, bg_color)
 	}
 end
 
+function NewProgressBar(callback, maximum_value, color, bg_color)
+	bg_color = bg_color or colors.black
+	maximum_value = maximum_value or 100
+	return {
+		callback = callback,
+		bg_color = bg_color,
+		maximum_value = maximum_value,
+
+		draw = function(self, monitor, parent_rect)
+			local rect = parent_rect:set_h(3):shift_x(1):shift_w(-2)
+			DrawBox(monitor, rect, self.bg_color)
+			local progress = self.callback() / self.maximum_value
+			local progress_rect = rect:set_w(math.floor(rect.w * progress))
+			DrawBox(monitor, progress_rect, color)
+			return 3
+		end,
+
+		to_string = function(self)
+			return "ProgressBar(" .. self.callback() .. ", " .. self.bg_color .. ")"
+		end
+	}
+end
+
 function CreateDiv(rect, style, title)
 	style = style or NewStyle()
 	-- title is nil-able

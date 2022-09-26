@@ -8,6 +8,10 @@ framework.SetDebugMonitorId("top")
 
 local induction_matrix = peripheral.wrap("inductionPort_0")
 
+local function get_energy_capacity_fn()
+	return "Capacity: " .. framework.CompactValue(induction_matrix.getMaxEnergy() / 10 * 4)
+end
+
 local function get_stored_energy_fn()
 	return "Stored: " .. framework.CompactValue(induction_matrix.getEnergy() / 10 * 4)
 end
@@ -33,6 +37,7 @@ local function register_main_page()
 	local main_style = main_style or framework.NewStyle(true, true, true, colors.white, colors.gray, colors.black)
 	
 	local body = document:append_percentage_div(framework.NewRect(0, 0, 0.45, 1), main_style, "Energy") -- create div 1
+	body:add_element(framework.NewDynamicText(get_energy_capacity_fn, main_style.color, main_style.background_color))
 	body:add_element(framework.NewDynamicText(get_stored_energy_fn, main_style.color, main_style.background_color))
 	body:add_element(framework.NewDynamicText(get_input_energy_fn, main_style.color, main_style.background_color))
 	body:add_element(framework.NewDynamicText(get_output_energy_fn, main_style.color, main_style.background_color))

@@ -31,6 +31,7 @@ local function register_main_page()
 	right_panel:append_text("Start") -- create text 4
 	right_panel:append_text("Options") -- create text 4
 	right_panel:append_text("Exit") -- create text 4
+	right_panel:add_element(framework.NewProgressBar(function() return 0.5 end, 1, colors.lime, colors.lightGray))
 
 	local new_button_event = function()
 		framework.DebugLog("test")
