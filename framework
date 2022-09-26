@@ -259,7 +259,8 @@ function NewButton(text, onclick_event, color, background_color)
 		color = color,
 		background_color = background_color,
 		onclick_event = onclick_event,
-
+		interactable = true,
+		activated = true,
 		drew_region = nil,
 
 		region = function(self, rect)
@@ -267,11 +268,13 @@ function NewButton(text, onclick_event, color, background_color)
 		end,
 
 		check_click = function(self, pos)
-			DebugLog("Button getting clicked")
-			if self.drew_region then
-				return self.drew_region:in_bounds(pos.x, pos.y)
-			else 
-				return false
+			if self.interactable then
+				if self.drew_region then
+					DebugLog(self.drew_region:in_bounds(pos.x, pos.y))
+					return self.drew_region:in_bounds(pos.x, pos.y)
+				else 
+					return false
+				end
 			end
 		end,
 
@@ -292,6 +295,7 @@ function NewText(text, color, bg_color)
 		text = text,
 		color = color,
 		bg_color = bg_color,
+		activated = true,
 
 		draw = function(self, monitor, parent_rect)
 			return DrawTextWrap(monitor, NewVector2(parent_rect.x + 1, parent_rect.y + 1), self.text, parent_rect.w - 2, self.color, self.bg_color)
@@ -310,6 +314,7 @@ function NewDynamicText(callback, color, bg_color)
 		callback = callback,
 		color = color,
 		bg_color = bg_color,
+		activated = true,
 
 		draw = function(self, monitor, parent_rect)
 			return DrawTextWrap(monitor, NewVector2(parent_rect.x + 1, parent_rect.y + 1), self.callback(), parent_rect.w - 2, self.color, self.bg_color)
@@ -328,13 +333,20 @@ function NewProgressBar(callback, maximum_value, color, bg_color)
 		callback = callback,
 		bg_color = bg_color,
 		maximum_value = maximum_value,
+		activated = true,
 
 		draw = function(self, monitor, parent_rect)
 			local rect = parent_rect:set_h(3):shift_x(1):shift_w(-2)
-			DrawBox(monitor, rect, self.bg_color)
-			local progress = self.callback() / self.maximum_value
-			local progress_rect = rect:set_w(math.floor(rect.w * progress))
-			DrawBox(monitor, progress_rect, color)
+			local value = self.callback()
+			if value == nil then
+				DrawBox(monitor, rect, self.bg_color)
+				DrawBox(monitor, rect, colors.lightGray)
+			else
+				local progress = value / self.maximum_value
+				local progress_rect = rect:set_w(math.floor(rect.w * progress))
+				DrawBox(monitor, rect, self.bg_color)
+				DrawBox(monitor, progress_rect, color)
+			end
 			return 3
 		end,
 
@@ -352,13 +364,14 @@ function CreateDiv(rect, style, title)
 		rect = rect,
 		style = style,
 		title = title,
+		activated = true,
 
 		-- child elemets
 		elements = {},
 
 		add_element = function(self, element)
 			table.insert(self.elements, element)
-			return self
+			return element
 		end,
 
 		get_border_rect = function(self)
@@ -381,10 +394,16 @@ function CreateDiv(rect, style, title)
 
 				if element.check_click then
 					if element:check_click(pos) then
+						DebugLog("Calling Onclick Event")
 						element:onclick_event()
 					end
 				end
 			end
+		end,
+
+		redraw_all = function(self, monitor, parent_rect)
+			self:draw_frame(monitor, parent_rect)
+			self:draw(monitor, parent_rect)
 		end,
 
 		draw_frame = function(self, monitor, parent_rect)
@@ -405,8 +424,10 @@ function CreateDiv(rect, style, title)
 			
 			-- Draw Child Div
 			for _, element in ipairs(self.elements) do
-				if element.draw_frame then
-					element:draw_frame(monitor)
+				if element.activated then
+					if element.draw_frame then
+						element:draw_frame(monitor)
+					end
 				end
 			end
 		end,
@@ -418,8 +439,10 @@ function CreateDiv(rect, style, title)
 			local content_rect = self:get_content_rect()
 
 			for _, element in ipairs(self.elements) do
-				local space_used = element:draw(monitor, content_rect:shift_y(cursor_pos):shift_h(-cursor_pos))
-				cursor_pos = cursor_pos + space_used + self.style.line_spacing
+				if element.activated then
+					local space_used = element:draw(monitor, content_rect:shift_y(cursor_pos):shift_h(-cursor_pos))
+					cursor_pos = cursor_pos + space_used + self.style.line_spacing
+				end
 			end
 			return self.rect.h
 		end,
@@ -460,6 +483,13 @@ function CreateWindow(screen, title, main_style)
 	return {
 		style = main_style,
 		document = document,
+		activated = true,
+
+		redraw_all = function(self, monitor)
+			self.document:draw_frame(monitor)
+			self.document:draw(monitor)
+		end,
+
 		draw_frame = function(self, monitor, screen)
 			self.document:draw_frame(monitor, screen)
 		end,
@@ -510,6 +540,17 @@ function CreateMonitor(monitor_id, text_scale)
 			return created_window.document
 		end,
 
+		redraw_all = function(self)
+			self:clear()
+			self:draw_screen_button()
+			for _, window in ipairs(self.windows) do
+				if window.activated then
+					window:draw_frame(self.monitor, self.screen)
+					window:draw(self.monitor, self.screen)
+				end
+			end
+		end,
+
 		draw_screen_button = function (self)
 			DrawPixel(self.monitor, 1, 1, colors.red)
 			DrawPixel(self.monitor, 2, 1, colors.yellow)
@@ -520,7 +561,9 @@ function CreateMonitor(monitor_id, text_scale)
 			self:clear()
 			self:draw_screen_button()
 			for _, window in ipairs(self.windows) do
-				window:draw_frame(self.monitor, self.screen)
+				if window.activated then
+					window:draw_frame(self.monitor, self.screen)
+				end
 			end
 		end,
 
@@ -572,7 +615,7 @@ end
 local function events()
 	while true do
 		local event, p1, p2, p3 = os.pullEvent()
-		if event ~= "timer" then
+		if event ~= "timer" and event ~= "task_complete" then
 			DebugLog(event, colors.pink)
 		end
 
