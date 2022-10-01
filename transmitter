@@ -1,0 +1,60 @@
+---@diagnostic disable: undefined-global
+-- Author: XiaNight
+-- Date: 2022/09/29
+
+function NewData(messageCallback, channel)
+	return {
+		message = "",
+		channel = channel,
+		messageCallback,
+		QuerryMessage = function(self)
+			self.message = self.messageCallback()
+		end
+	}
+end
+
+local modem = nil
+
+function NewModem(peripheralId, channel, replyChannel)
+
+	if modem ~= nil then
+		return nil
+	end
+
+	modem = peripheral.wrap(peripheralId)
+
+	return {
+		modem = modem,
+		channel = channel,
+		replyChannel = replyChannel,
+		datas = {},
+
+		AddData = function(self, data)
+			table.insert(self.datas, data)
+		end,
+
+		SendAllData = function(self)
+			-- quarry data first
+			for _, data in pairs(self.datas) do
+				data:QuerryMessage()
+			end
+			for _, data in pairs(self.datas) do
+				self.modem.transmit(data.channel, self.replyChannel, data.message)
+			end
+		end
+	}
+end
+
+function Main()
+	while true do
+		modem:SendAllData()
+	end
+end
+
+function Init()
+	if modem == nil then
+		print("No Modem found")
+		return
+	end
+	parallel.waitForAny(Main)
+end

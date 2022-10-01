@@ -1,6 +1,50 @@
 ---@diagnostic disable: undefined-global
--- Author: XiaNight
--- Date: 2022/09/22
+-- Copyright 2022 XiaNight
+
+--Licensed under the Apache License, Version 2.0 (the "License");
+--you may not use this file except in compliance with the License.
+--You may obtain a copy of the License at
+
+--    http://www.apache.org/licenses/LICENSE-2.0
+
+--Unless required by applicable law or agreed to in writing, software
+--distributed under the License is distributed on an "AS IS" BASIS,
+--WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+--See the License for the specific language governing permissions and
+--limitations under the License.
+
+-- This is a framwork that mimics the behavior of HTML and CSS in Minecraft ComputerCraft.
+-- With this framework, you can create a GUI with a few lines of code.
+-- The concept of this framework is inspired by the HTML and CSS of the web.
+-- This framework is still in development, and there are many bugs.
+-- If you find any bugs, please report them to me.
+-- If you have any suggestions, please tell me.
+-- If you want to contribute to this project, please contact me.
+
+-- This frameworks basic structure is as follows:
+-- Monitor
+-- 	Window
+-- 		Div
+-- 			Text: You can use this element to create a static text.
+-- 			DynamicText: You can use this element to create a dynamic text. Which means that the text will be updated every frame.
+-- 			Button: Can handle click events on the monitor.
+-- 			ProgressBar: You can use this element to create a progress bar.
+-- 			Slider (Work in progress): You can use this element to create a slider.
+-- 			CheckBox (Work in progress): You can use this element to create a checkbox.
+-- and so on...
+-- Each element has a style, and the style is inherited from the parent element.
+-- The style of the element can be changed by the style attribute of the element.
+-- Each Div can have multiple elements, and each element can have multiple children elements.
+-- The Monitor is the main element, and the Window is the only child element of the Monitor.
+-- The Window can have only one Div, which is the document, just like the HTML document.
+-- While the HTML document supports GetElementById, this framework still does not support it. (I will add it later)
+
+-- This framework also has some cool features, such as:
+-- 1. DebugLog: You can use this function to print debug information to the debug monitor. (Inspired by the Debug.Log function from Unity)
+-- 2. Debut Monitor: You can use this monitor to print debug information.
+-- 3. Div frame: Each div has a frame, which can be used to display the div's position and size.
+-- 4. Framerate Control: You can use this function to control the framerate of the monitor.
+-- 5. Modem Support: You can use this function to send messages to other computers, or receive messages from other computers.
 
 ----- Global Variables -----
 
@@ -149,6 +193,7 @@ function NewStyle(has_margin, has_border, has_padding, color, border_color, back
 	}
 end
 
+-- compact the value to add a suffix to the end if it is too long, with the standard K, M, G, T, P, E, Z, Y suffixes
 function CompactValue(value)
 	-- return value with K, M, G, T, P, E, Z, Y suffixes
 	local suffixes = {"", "K", "M", "G", "T", "P", "E", "Z", "Y"}
@@ -204,6 +249,7 @@ function DrawText(monitor, pos, text, color, bg_color)
 	monitor.write(text)
 end
 
+-- Wrap the text to fit in the given width, returns a table of lines
 local function wrap_text(str, limit)
 	limit = limit or 72
 	local here = 1
@@ -612,11 +658,50 @@ local function on_click(monitor_id, pos)
 	return 0
 end
 
+local modem_data_listeners = {}
+
+function NewModemDataListener(channel, sub_channel, callback, data_caster)
+	callback = callback or nil
+	data_caster = data_caster or nil
+
+	local data_listener = {
+		channel = channel,
+		sub_channel = sub_channel,
+		callback = callback,
+		raw_message = "",
+		message = "",
+
+		handle = function(self, sender_channel, reply_channel, message)
+			if sender_channel == self.channel and reply_channel == self.sub_channel then
+				self.raw_message = message
+				if self.data_caster ~= nil then
+					message = self.data_caster(message)
+				end
+				self.message = message
+				if self.callback ~= nil then
+					self.callback(message)
+				end
+			end
+		end
+	}
+	table.insert(modem_data_listeners, data_listener)
+	return data_listener
+end
+
+local os_event = nil
+
 local function events()
 	while true do
-		local event, p1, p2, p3 = os.pullEvent()
+		local event, p1, p2, p3, p4, p5 = os_event()
 		if event ~= "timer" and event ~= "task_complete" then
 			DebugLog(event, colors.pink)
+		end
+
+		-- handle modem messages
+		if event == "modem_message" then
+			for _, listener in ipairs(modem_data_listeners) do
+				listener:handle(p2, p3, p4)
+			end
 		end
 
 		if event == "monitor_touch" then
@@ -650,9 +735,10 @@ local function draw_loop()
 	end
 end
 
-function Init(frequency)
+function Init(frequency, osEvent)
 	frequency = frequency or 0.5
 	update_frequency = frequency
+	os_event = osEvent
 
 	DebugLog("Framework Initiating", colors.green)
 	DebugLog("Press Q to quit...", colors.green)

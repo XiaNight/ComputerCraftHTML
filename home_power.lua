@@ -90,12 +90,18 @@ local function register_main_page()
 	framework.RegisterMonitor(main_monitor)
 end
 
--- for key, value in pairs(induction_matrix) do
--- 	framework.DebugLog(key)
--- end
+local function register_modem_data_listeners()
+	framework.NewModemDataListener(1, 1, function(data)
+		framework.DebugLog("Received Data: " .. data)
+	end)
+end
 
 framework.DebugLog("Energy: " .. (induction_matrix.getEnergy() / 10 * 4))
 
 register_main_page()
+register_modem_data_listeners()
 
-framework.Init(0.5)
+local modem = peripheral.wrap("modem_0")
+modem.open(1)
+
+framework.Init(5, os.pullEvent)

@@ -1,0 +1,33 @@
+
+local induction_matrix = peripheral.wrap("left")
+
+local function get_output_energy_fn()
+	return induction_matrix.getLastOutput() / 10 * 4
+end
+
+
+-- print average energy usage
+local average_data_length = 100
+local energy_usage = {}
+for i = 1, average_data_length do
+	table.insert(energy_usage, 0)
+end
+local current_index = 1
+
+local function Main()
+	while true do
+		local output_energy = get_output_energy_fn()
+		energy_usage[current_index] = output_energy
+		current_index = current_index + 1
+		if current_index > average_data_length then
+			current_index = 1
+		end
+		local sum = 0
+		for _, energy in pairs(energy_usage) do
+			sum = sum + energy
+		end
+		print(sum / average_data_length)
+	end
+end
+
+parallel.waitForAny(Main)
